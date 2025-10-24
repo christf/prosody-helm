@@ -1,0 +1,153 @@
+# Default values for prosody-helm.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+
+# use the following renovate snippet for auto-update
+#         {
+#          'description': 'version upgrade for tag spec with renovate comment',
+#          'fileMatch': [
+#              '(^|/)path/*/.+.ya?ml$'
+#            ],
+#          'matchStringsStrategy': 'any',
+#          'matchStrings': [
+#            '# renovate: datasource=(?<datasource>[a-z]+)\n *repository: (?<depName>[a-zA-Z0-9/]+)\n *tag: (?<currentValue>[0-9\.]+)'
+#            ],
+#        },
+#
+replicaCount: 1
+
+prosody:
+  image:
+    # renovate: datasource=docker
+    repository: prosodyim/prosody
+    tag: 13.0
+
+slidgeWhatsapp:
+  image:
+    # renovate: datasource=docker
+    repository: codeberg.org/slidge/slidge-whatsapp
+    tag: v0.3.7-amd64
+
+slidgeDiscord:
+  image:
+    # renovate: datasource=docker
+    repository: codeberg.org/slidge/slidcord
+    tag: v0.3.0
+
+slidgeMatrix:
+  image:
+    # renovate: datasource=docker
+    repository: codeberg.org/slidge/matridge
+    tag: v0.3.1
+
+slidgeSignal:
+  image:
+    # renovate: datasource=docker
+    repository: prosodyim/prosody
+    tag: 13.0
+
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+image:
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+volumes:
+  - name: prosody-cert
+    secret:
+      secretName: prosody-cert
+  - name: prosody-logs
+    emptyDir:
+      sizeLimit: 100M
+  - name: slidge-matrix-data
+    persistentVolumeClaim:
+      claimName: slidge-matrix-data
+  - name: slidge-whatsapp-data
+    persistentVolumeClaim:
+      claimName: slidge-whatsapp-data
+  - name: slidge-discord-data
+    persistentVolumeClaim:
+      claimName: slidge-discord-data
+  - name: prosody-data
+    persistentVolumeClaim:
+      claimName: prosody-data
+  - name: prosody-config
+    persistentVolumeClaim:
+      claimName: prosody-config
+  - name: prosody-modules
+    persistentVolumeClaim:
+      claimName: prosody-modules
+
+

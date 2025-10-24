@@ -1,0 +1,167 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "prosody-helm.fullname" . }}
+  labels:
+    {{- include "prosody-helm.labels" . | nindent 4 }}
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "prosody-helm.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "prosody-helm.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "prosody-helm.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.prosody.image.repository }}:{{ .Values.prosody.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: __FLUSH_LOG
+              value: "1"
+          ports:
+            - containerPort: 5280
+              protocol: TCP
+              name: http
+            - containerPort: 5281
+              protocol: TCP
+              name: https
+            - containerPort: 5222
+              protocol: TCP
+              name: c2s
+            - containerPort: 5269
+              protocol: TCP
+              name: s2s
+          livenessProbe:
+            timeoutSeconds: 5
+            exec:
+              command:
+                - prosodyctl
+                - --config
+                - /etc/prosody/prosody.cfg.lua
+                - status
+          readinessProbe:
+            timeoutSeconds: 5
+            exec:
+              command:
+                - prosodyctl
+                - --config
+                - /etc/prosody/prosody.cfg.lua
+                - status
+          startupProbe:
+            exec:
+              command:
+                - prosodyctl
+                - --config
+                - /etc/prosody/prosody.cfg.lua
+                - status
+          volumeMounts:
+            - mountPath: /var/log/prosody
+              name: prosody-logs
+            - mountPath: /etc/prosody
+              name: prosody-config
+            - mountPath: /var/lib/prosody
+              name: prosody-data
+            - mountPath: /var/lib/prosody/custom_plugins
+              name: prosody-modules
+            - mountPath: /etc/prosody/certs
+              name: prosody-cert
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        {{- toYaml .Values.volumes | nindent 8 }}
+
+spec:
+  template:
+    spec:
+      containers:
+      - name: slidge-matrix
+        # renovate: datasource=docker
+        image: codeberg.org/slidge/matridge:v0.3.1
+        imagePullPolicy: IfNotPresent
+        args: ["-d",
+        "--jid", "slidge-matrix.christofschulze.com",
+        "--secret", "$(SECRET)",
+        "--user-jid-validator", '.*@christofschulze\.com',
+        "--home-dir", "/var/lib/slidge/slidge-matrix.christofschulze.com",
+        "--max-history-fetch", "50" ]
+        env:
+          - name: SECRET
+            valueFrom:
+              secretKeyRef:
+                name: slidge-matrix-secret
+                key: SECRET
+        volumeMounts:
+          - mountPath: /var/lib/slidge/slidge-matrix.christofschulze.com
+            name: slidge-matrix-data
+      - name: slidge-whatsapp
+        # renovate: datasource=docker
+        image: codeberg.org/slidge/slidge-whatsapp:v0.3.7-amd64
+        imagePullPolicy: IfNotPresent
+        args: ["-d",
+               "--jid", "slidge-whatsapp.christofschulze.com",
+               "--secret", "$(SECRET)",
+               "--user-jid-validator", '.*@christofschulze\.com',
+               "--mam-max-days", "60",
+               "--server", "localhost",
+               "--muc-back-fill", "100"]
+        env:
+          - name: SECRET
+            valueFrom:
+              secretKeyRef:
+                name: slidge-whatsapp-secret
+                key: SECRET
+        volumeMounts:
+          - mountPath: /var/lib/slidge/slidge-whatsapp.christofschulze.com
+            name: slidge-whatsapp-data
+      - name: slidge-discord
+        # renovate: datasource=docker
+        image: codeberg.org/slidge/slidcord:v0.3.0
+        imagePullPolicy: IfNotPresent
+        args: ["-d",
+               "--jid", "slidge-discord.christofschulze.com",
+               "--secret", "$(SECRET)",
+               "--user-jid-validator", '.*@christofschulze\.com',
+               "--mam-max-days", "30",
+               "--server", "localhost",
+               "--muc-back-fill", "50"]
+        env:
+          - name: SECRET
+            valueFrom:
+              secretKeyRef:
+                name: slidge-discord-secret
+                key: SECRET
+        volumeMounts:
+          - mountPath: /var/lib/slidge/slidge-discord.christofschulze.com
+            name: slidge-discord-data
