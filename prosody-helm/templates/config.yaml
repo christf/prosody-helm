@@ -1,0 +1,9 @@
+apiVersion: v1
+data:
+  prosody.cfg: {{ .Values.prosody.config }}
+  conf.d/test.cfg: "--- there is no data here"
+kind: ConfigMap
+metadata:
+  name: {{ include "prosody-helm.fullname" . }}-config
+  labels:
+    {{- include "prosody-helm.labels" . | nindent 4 }}

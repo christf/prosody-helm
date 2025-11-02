@@ -7,9 +7,7 @@ metadata:
   annotations:
     reloader.stakater.com/auto: "true"
 spec:
-  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
-  {{- end }}
   selector:
     matchLabels:
       {{- include "prosody-helm.selectorLabels" . | nindent 6 }}
@@ -33,11 +31,13 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.prosody.image.repository }}:{{ .Values.prosody.image.tag }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: __FLUSH_LOG
               value: "1"
+            {{ .Values.prosody.env }}
+          -- todo: add secrets for slidge
           ports:
             - containerPort: 5280
               protocol: TCP
@@ -75,8 +75,6 @@ spec:
                 - /etc/prosody/prosody.cfg.lua
                 - status
           volumeMounts:
-            - mountPath: /var/log/prosody
-              name: prosody-logs
             - mountPath: /etc/prosody
               name: prosody-config
             - mountPath: /var/lib/prosody
@@ -86,7 +84,35 @@ spec:
             - mountPath: /etc/prosody/certs
               name: prosody-cert
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+              {{- toYaml .Values.resources | nindent 12 }}
+      {{- if .Values.slidge }}
+      {{- if .Values.slidge.matrix }}
+      {{- if .Values.slidge.matrix.enabled }}
+      {{- if eq(.Values.slidge.matrix.enabled) "true" -}}
+      {{- with .Values.slidge.matrix }}
+      - name: slidge-matrix
+        image: {{ .repository }}:{{ .tag }}
+        imagePullPolicy: IfNotPresent
+        args: ["-d",
+        "--jid", {{ .component }}
+        "--secret", "$(SECRET)",
+        "--user-jid-validator", {{ .jidValidator }}
+        "--home-dir", "/var/lib/slidge/slidge-matrix"
+        "--max-history-fetch", {{ .maxHistoryFetch }} ]
+        env:
+          - name: SECRET
+            valueFrom:
+              secretKeyRef:
+                name: {{ .secretName }}
+                key: SECRET
+        volumeMounts:
+          - mountPath: /var/lib/slidge/slidge-matrix"
+            name: slidge-matrix-data
+        {{- end -}}
+        {{- end -}}
+        {{- end -}}
+        {{- end -}}
+      {{- end -}}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -100,42 +126,117 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       volumes:
-        {{- toYaml .Values.volumes | nindent 8 }}
+        - name: prosody-config
+          configMap:
+            name: {{ include "prosody-helm.fullname" . }}-config
+        {{- if .Values.ingress }}
+        {{- if .Values.ingress.enabled }}
+        {{- if eq(.Values.ingress.enabled) "true" }}
+        {{- if .Values.ingress.tls }}
+        {{- if .Values.ingress.tls.secretName }}
+        - name: {{ .Values.ingress.tls.secretName }}
+          secret:
+            secretName: prosody-cert
+        {{- end -}}
+        {{- end -}}
+        {{- end -}}
+        {{- end -}}
+        {{- end -}}
+        {{- if .Values.slidge }}
+        {{- if .Values.slidge.matrix }}
+        {{- if .Values.slidge.matrix.enabled }}
+        {{- if eq(.Values.slidge.matrix.enabled) "true" }}
+        - name: slidge-matrix-data
+          persistentVolumeClaim:
+            claimName: {{ include "prosody-helm.fullname" . }}-matrix-data
+        {{- end -}}
+        {{- end -}}
+        {{- end -}}
+        {{- if .Values.slidge.whatsapp }}
+        {{- if .Values.slidge.whatsapp.enabled }}
+        {{- if eq(.Values.slidge.whatsapp.enabled) "true" }}
+        - name: slidge-whatsapp-data
+          persistentVolumeClaim:
+            claimName: {{ include "prosody-helm.fullname" . }}-whatsapp-data
+        {{- end -}}
+        {{- end -}}
+        {{- end -}}
+        {{- if .Values.slidge.discord }}
+        {{- if .Values.slidge.discord.enabled }}
+        {{- if eq(.Values.slidge.discord.enabled) "true" }}
+        - name: slidge-discord-data
+          persistentVolumeClaim:
+            claimName: {{ include "prosody-helm.fullname" . }}-discord-data
+        {{- end -}}
+        {{- end -}}
+        {{- end -}}
+        {{- if .Values.slidge.signal }}
+        {{- if .Values.slidge.signal.enabled }}
+        {{- if eq(.Values.slidge.signal.enabled) "true" }}
+        - name: slidge-signal-data
+          persistentVolumeClaim:
+            claimName: {{ include "prosody-helm.fullname" . }}-signal-data
+        {{- end -}}
+        {{- end -}}
+        {{- end -}}
+        {{- end -}}
+        - name: prosody-data
+          persistentVolumeClaim:
+            claimName: {{ include "prosody-helm.fullname" . }}-data
+        - name: prosody-modules
+          persistentVolumeClaim:
+            claimName: {{ include "prosody-helm.fullname" . }}-modules
 
-spec:
-  template:
-    spec:
-      containers:
-      - name: slidge-matrix
-        # renovate: datasource=docker
-        image: codeberg.org/slidge/matridge:v0.3.1
-        imagePullPolicy: IfNotPresent
-        args: ["-d",
-        "--jid", "slidge-matrix.christofschulze.com",
-        "--secret", "$(SECRET)",
-        "--user-jid-validator", '.*@christofschulze\.com',
-        "--home-dir", "/var/lib/slidge/slidge-matrix.christofschulze.com",
-        "--max-history-fetch", "50" ]
-        env:
-          - name: SECRET
-            valueFrom:
-              secretKeyRef:
-                name: slidge-matrix-secret
-                key: SECRET
-        volumeMounts:
-          - mountPath: /var/lib/slidge/slidge-matrix.christofschulze.com
-            name: slidge-matrix-data
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      - name: slidge-signal¬
+        # renovate: datasource=docker¬
+        image: {{ .repository }}:{{ .tag }}
+        imagePullPolicy: Always¬
+        args: ["-d",¬
+                "--jid", {{ .component }}
+                "--secret", "$(SECRET)",¬
+                "--user-jid-validator", {{ .jidValidator }}
+                "--mam-max-days", "60",¬
+                "--server", "localhost",¬
+                "--muc-back-fill", "100"]¬
+        env:¬
+          - name: SECRET¬
+            valueFrom:¬
+              secretKeyRef:¬
+                name: slidge-signal-secret¬
+                key: SECRET¬
+        volumeMounts:¬
+          - mountPath: /var/lib/slidge/slidge-signal
+            name: slidge-signal-data¬
       - name: slidge-whatsapp
         # renovate: datasource=docker
-        image: codeberg.org/slidge/slidge-whatsapp:v0.3.7-amd64
+        image: {{ .repository }}:{{ .tag }}
         imagePullPolicy: IfNotPresent
         args: ["-d",
-               "--jid", "slidge-whatsapp.christofschulze.com",
+               "--jid", {{ .component }}
                "--secret", "$(SECRET)",
-               "--user-jid-validator", '.*@christofschulze\.com',
+               "--user-jid-validator", {{ .jidValidator }}
                "--mam-max-days", "60",
-               "--server", "localhost",
-               "--muc-back-fill", "100"]
+               "--server", "localhost"
+               ]
         env:
           - name: SECRET
             valueFrom:
@@ -143,16 +244,16 @@ spec:
                 name: slidge-whatsapp-secret
                 key: SECRET
         volumeMounts:
-          - mountPath: /var/lib/slidge/slidge-whatsapp.christofschulze.com
+          - mountPath: /var/lib/slidge/slidge-whatsapp
             name: slidge-whatsapp-data
       - name: slidge-discord
         # renovate: datasource=docker
-        image: codeberg.org/slidge/slidcord:v0.3.0
+        image: {{ .repository }}:{{ .tag }}
         imagePullPolicy: IfNotPresent
         args: ["-d",
-               "--jid", "slidge-discord.christofschulze.com",
+               "--jid", {{ .component }}
                "--secret", "$(SECRET)",
-               "--user-jid-validator", '.*@christofschulze\.com',
+               "--user-jid-validator", {{ .jidValidator }}
                "--mam-max-days", "30",
                "--server", "localhost",
                "--muc-back-fill", "50"]
@@ -163,5 +264,5 @@ spec:
                 name: slidge-discord-secret
                 key: SECRET
         volumeMounts:
-          - mountPath: /var/lib/slidge/slidge-discord.christofschulze.com
+          - mountPath: /var/lib/slidge/slidge-discord
             name: slidge-discord-data
